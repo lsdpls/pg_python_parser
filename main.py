@@ -88,7 +88,7 @@ if __name__ == "__main__":
     from PostgreSQLLexer import PostgreSQLLexer
     from PostgreSQLParser import PostgreSQLParser
 
-    query = "SELECT column1, column2 FROM table1 WHERE column3 = 'value' ORDER BY column1 LIMIT 10; SELECT column1 FROM table1 WHERE column3 <= 'value' AND column2 <> 'value'ORDER BY column1 LIMIT 10;"
+    query = "SELECT column1, column2 FROM table1 WHERE column3 = 'value' ORDER BY column1 LIMIT 10; SELECT column1 FROM table2 WHERE column3 <= 'value' AND column2 <> 'value' GROUP BY column1 LIMIT 5;"
     
     # Create input stream from the query
     input_stream = InputStream(query)
