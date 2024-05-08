@@ -1,1 +1,126 @@
-antlr4 -v 4.13.0 -Dlanguage=Python3 PostgreSQL.g4
+antlr4 -v 4.13.1 -Dlanguage=Python3 PostgreSQL.g4 -visitor
+java -jar ./tools/antlr-4.13.1-complete.jar -Dlanguage=Python3 ./Golang/PostgreSQLLexer.g4 -o parser -visitor
+java -jar ./tools/antlr-4.13.1-complete.jar -Dlanguage=Python3 PostgreSQL.g4 -visitor
+"SELECT column1, column2 FROM table1 WHERE column3 = 'value' ORDER BY column1 LIMIT 10;"
+
+
+/////
+
+
+
+def parse_query(query):
+    # Create input stream from the query
+    input_stream = InputStream(query)
+
+    # Create lexer for the input stream
+    lexer = PostgreSQLLexer(input_stream)
+
+    # Get all tokens from the lexer
+    token_stream = CommonTokenStream(lexer)
+
+    # Create parser for the token stream
+    parser = PostgreSQLParser(token_stream)
+
+    # Parse the query and return the syntax tree
+    return parser.query()
+
+def main():
+    query = "SELECT column1, column2 FROM table1 WHERE column3 = 'value' ORDER BY column1 LIMIT 10;"
+    tree = parse_query(query)
+    print(tree.toStringTree(recog=PostgreSQLParser))
+
+if __name__ == '__main__':
+    main()
+
+
+
+////////
+
+
+
+from PostgreSQLVisitor import PostgreSQLVisitor
+from PostgreSQLParser import PostgreSQLParser
+
+class QueryBuilder(PostgreSQLVisitor):
+    def visitQuery(self, ctx:PostgreSQLParser.QueryContext):
+        select_list = self.visit(ctx.select_list())
+        from_clause = self.visit(ctx.table_references())
+        where_clause = self.visit(ctx.where_clause()) if ctx.where_clause() else None
+        group_by_clause = self.visit(ctx.group_by_clause()) if ctx.group_by_clause() else None
+        order_by_clause = self.visit(ctx.order_by_clause()) if ctx.order_by_clause() else None
+        limit_clause = self.visit(ctx.limit_clause()) if ctx.limit_clause() else None
+        return {
+            "select_list": select_list,
+            "from_clause": from_clause,
+            "where_clause": where_clause,
+            "group_by_clause": group_by_clause,
+            "order_by_clause": order_by_clause,
+            "limit_clause": limit_clause
+        }
+
+    def visitSelect_list(self, ctx:PostgreSQLParser.Select_listContext):
+        return [self.visit(select_item) for select_item in ctx.select_item()]
+
+    def visitSelect_item(self, ctx:PostgreSQLParser.Select_itemContext):
+        return self.visit(ctx.expression())
+
+    def visitTable_references(self, ctx:PostgreSQLParser.Table_referencesContext):
+        return [table.getText() for table in ctx.IDENTIFIER()]
+
+    def visitWhere_clause(self, ctx:PostgreSQLParser.Where_clauseContext):
+        return self.visit(ctx.condition())
+
+    def visitGroup_by_clause(self, ctx:PostgreSQLParser.Group_by_clauseContext):
+        return [self.visit(expression) for expression in ctx.expression_list().expression()]
+
+    def visitOrder_by_clause(self, ctx:PostgreSQLParser.Order_by_clauseContext):
+        return [self.visit(expression) for expression in ctx.expression_list().expression()]
+
+    def visitLimit_clause(self, ctx:PostgreSQLParser.Limit_clauseContext):
+        return int(ctx.NUMBER().getText())
+
+    def visitExpression(self, ctx:PostgreSQLParser.ExpressionContext):
+        if ctx.IDENTIFIER():
+            return ctx.IDENTIFIER().getText()
+        elif ctx.NUMBER():
+            return int(ctx.NUMBER().getText())
+        elif ctx.STRING():
+            return ctx.STRING().getText()[1:-1]  # Remove quotes
+
+    def visitCondition(self, ctx:PostgreSQLParser.ConditionContext):
+        left = self.visit(ctx.expression(0))
+        op = ctx.comparison_op().getText()
+        right = self.visit(ctx.expression(1))
+        return {"left": left, "op": op, "right": right}
+
+# Example usage
+if __name__ == "__main__":
+    from antlr4 import *
+    from PostgreSQLLexer import PostgreSQLLexer
+    from PostgreSQLParser import PostgreSQLParser
+
+    query = "SELECT column1, column2 FROM table1 WHERE column3 = 'value' ORDER BY column1 LIMIT 10;"
+    
+    # Create input stream from the query
+    input_stream = InputStream(query)
+    
+    # Create lexer for the input stream
+    lexer = PostgreSQLLexer(input_stream)
+    
+    # Get all tokens from the lexer
+    token_stream = CommonTokenStream(lexer)
+    
+    # Create parser for the token stream
+    parser = PostgreSQLParser(token_stream)
+    
+    # Parse the query and get the root of the parse tree
+    tree = parser.query()
+
+    # Create a visitor instance
+    visitor = QueryBuilder()
+
+    # Build the query
+    query_dict = visitor.visit(tree)
+
+    # Print the query dictionary
+    print(query_dict)
